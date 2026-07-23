@@ -1,18 +1,23 @@
 ---
 name: api-server-setup
-description: "一键配置 Hermes API Server，生成连接参数供 App 使用"
-version: 1.0.0
+description: "一键配置 Hermes API Server + 中继客户端，生成连接参数供 App 使用"
+version: 2.0.0
 author: runbin-studio
 license: MIT
 metadata:
   hermes:
-    tags: [api-server, setup, mobile, gateway]
+    tags: [api-server, relay, tunnel, mobile, setup]
     homepage: https://github.com/runbin-studio/hermes-api-server-setup
 ---
 
-# API Server Setup
+# Hermes API Server + 中继配置
 
-一键在你的 Hermes 实例上启用 API Server，生成 App 连接所需的地址和密钥。
+让你的 Hermes 实例可以被手机 App 访问。支持两种场景：
+
+| 场景 | 方案 | 用户需要 |
+|------|------|---------|
+| **云服务器**（有公网 IP） | API Server 直连 | 开安全组端口 |
+| **家里电脑/NAS**（无公网 IP） | 中继模式 | 一个 token |
 
 ## 用法
 
@@ -20,55 +25,74 @@ metadata:
 # 加载技能
 /skill api-server-setup
 
-# 或直接运行
-hermes -s api-server-setup -q "帮我配置 API Server"
+# Agent 会先问你的场景：
+# 1. 云服务器 → 配置 API Server，输出连接参数
+# 2. 家里电脑 → 配置中继客户端，连接到中继服务器
 ```
 
-## 功能
+## 场景一：云服务器直连
+
+Agent 自动执行：
 
 1. 检查当前 API Server 配置状态
-2. 自动写入环境变量启用 API Server
+2. 写入环境变量启用 API Server（端口 8650）
 3. 生成随机 64 位 API Key
-4. 重启 Gateway 使配置生效
+4. 重启 Gateway
 5. 获取公网 IP
-6. 输出连接参数（含二维码文本）
-7. 检测端口是否对外开放
+6. 检测端口是否对外开放
+7. 输出连接参数（含二维码文本）
+
+## 场景二：家里电脑中继
+
+Agent 自动执行：
+
+1. 检查 API Server 是否运行
+2. 提示用户在 App 上注册获取 token
+3. 下载中继客户端 `relay-client.py`
+4. 安装为 systemd 服务，开机自启
+5. 输出 App 连接地址
 
 ## 输出示例
+
+### 云服务器模式
 
 ```
 ┌─────────────────────────────────────────────┐
 │  ✅ API Server 已启动                        │
-├─────────────────────────────────────────────┤
-│                                              │
-│  连接信息（在 App 中输入）：                   │
 │                                              │
 │  地址    118.196.76.18                       │
 │  端口    8650                                │
-│  Key     d20cfd6f99d30190eee505fb8972ea6b    │
-│                                              │
-│  二维码文本（App 扫码解析）：                  │
-│  hermes://118.196.76.18:8650?key=...         │
+│  Key     d20c...1b7d                         │
 │                                              │
 │  ⚠️ 别忘了去云服务器安全组开放 8650 端口！     │
-│  检测结果：端口未开放 → 请检查安全组配置       │
 └─────────────────────────────────────────────┘
 ```
 
-## 环境变量
+### 中继模式
 
-技能会自动设置以下环境变量到 `~/.hermes/.env`：
+```
+┌─────────────────────────────────────────────┐
+│  ✅ 中继连接已建立                           │
+│                                              │
+│  App 连接地址：                               │
+│  https://relay.example.com/relay/user-xxx    │
+│                                              │
+│  管理命令：                                   │
+│  systemctl --user status hermes-relay        │
+│  journalctl --user -u hermes-relay -f       │
+└─────────────────────────────────────────────┘
+```
 
-| 变量 | 默认值 | 说明 |
-|------|--------|------|
-| `API_SERVER_ENABLED` | `true` | 启用 API Server |
-| `API_SERVER_PORT` | `8650` | 监听端口 |
-| `API_SERVER_HOST` | `0.0.0.0` | 监听地址（允许外部访问） |
-| `API_SERVER_KEY` | `随机生成` | 认证密钥，64 位十六进制 |
+## 相关文件
+
+| 文件 | 用途 |
+|------|------|
+| `setup.sh` | 云服务器模式一键脚本 |
+| `relay-client.py` | 中继客户端（Python） |
+| `relay-setup.md` | 中继模式技能描述 |
 
 ## 依赖
 
 - Hermes Agent 已安装并运行
-- `curl`（用于获取公网 IP）
-- `openssl`（用于生成随机密钥）
-- `hermes gateway restart` 可用
+- `curl`、`openssl`
+- 中继模式需要 `websocket-client`（`pip install websocket-client`）
