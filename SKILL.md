@@ -1,7 +1,7 @@
 ---
 name: api-server-setup
 description: "一键配置 Hermes API Server + 中继客户端，生成连接参数供 App 使用"
-version: 2.0.0
+version: 2.1.0
 author: runbin-studio
 license: MIT
 metadata:
@@ -52,35 +52,29 @@ Agent 自动执行：
 4. 安装为 systemd 服务，开机自启
 5. 输出 App 连接地址
 
-## 输出示例
+## 中继客户端（relay-client.py）
 
-### 云服务器模式
+最新版本（v2.1.0）特性：
 
+- **中文消息支持**：body 显式 UTF-8 编码，解决 latin-1 编码错误
+- **SSE 流式转发**：逐 chunk 通过 WebSocket 转发，支持打字机效果
+- **自动重连**：WebSocket 断开后 5 秒自动重连
+- **systemd 集成**：支持 `--install` 参数安装为系统服务
+
+### 协议
+
+**注册**：
 ```
-┌─────────────────────────────────────────────┐
-│  ✅ API Server 已启动                        │
-│                                              │
-│  地址    118.196.76.18                       │
-│  端口    8650                                │
-│  Key     d20c...1b7d                         │
-│                                              │
-│  ⚠️ 别忘了去云服务器安全组开放 8650 端口！     │
-└─────────────────────────────────────────────┘
+POST /api/register
+Body: {"token": "user-xxx", "version": "1.0.0"}
+→ Response: {"ws_url": "wss://...", "relay_path": "/relay/user-xxx"}
 ```
 
-### 中继模式
-
+**流式请求转发**（客户端→中继→WebSocket→客户端→本地API Server）：
 ```
-┌─────────────────────────────────────────────┐
-│  ✅ 中继连接已建立                           │
-│                                              │
-│  App 连接地址：                               │
-│  https://relay.example.com/relay/user-xxx    │
-│                                              │
-│  管理命令：                                   │
-│  systemctl --user status hermes-relay        │
-│  journalctl --user -u hermes-relay -f       │
-└─────────────────────────────────────────────┘
+WS 消息（中继→客户端）: {"id":"req-xxx","method":"POST","path":"/v1/chat/completions","headers":{...},"body":"..."}
+WS 消息（客户端→中继，逐chunk）: {"id":"req-xxx","chunk":"data:...\n\n"}
+WS 消息（客户端→中继，结束）: {"id":"req-xxx","chunk":"","done":true}
 ```
 
 ## 相关文件
